@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>S&P 500 全期間チャート</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, sans-serif;
+            background: #0d1117;
+            color: #e6edf3;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        h1 {
+            text-align: center;
+            font-size: 1.8rem;
+            margin-bottom: 6px;
+            color: #58a6ff;
+        }
+        .subtitle {
+            text-align: center;
+            color: #8b949e;
+            font-size: 0.9rem;
+            margin-bottom: 16px;
+        }
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .stat-item { text-align: center; }
+        .stat-label {
+            font-size: 0.72rem;
+            color: #8b949e;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .stat-value {
+            font-size: 1.25rem;
+            font-weight: bold;
+            color: #3fb950;
+        }
+        .stat-value.blue { color: #58a6ff; font-size: 1rem; }
+        .stat-value.negative { color: #f85149; }
+        .range-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        .range-btn {
+            background: #21262d;
+            border: 1px solid #30363d;
+            color: #8b949e;
+            padding: 5px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            transition: all 0.2s;
+        }
+        .range-btn:hover { background: #30363d; color: #e6edf3; }
+        .range-btn.active {
+            background: #58a6ff;
+            border-color: #58a6ff;
+            color: #0d1117;
+            font-weight: bold;
+        }
+        #chart { width: 100%; height: 72vh; }
+        #loading {
+            text-align: center;
+            padding: 80px 20px;
+            color: #8b949e;
+            font-size: 1.1rem;
+        }
+        .spinner {
+            width: 40px; height: 40px;
+            border: 3px solid #21262d;
+            border-top-color: #58a6ff;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 0 auto 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        #error {
+            display: none;
+            text-align: center;
+            color: #f85149;
+            padding: 40px 20px;
+            font-size: 1rem;
+            background: #161b22;
+            border: 1px solid #f85149;
+            border-radius: 8px;
+            margin: 20px auto;
+            max-width: 600px;
+        }
+        .log-toggle {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 10px;
+            font-size: 0.85rem;
+            color: #8b949e;
+        }
+        .toggle-switch {
+            position: relative;
+            width: 36px; height: 20px;
+        }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            inset: 0;
+            background: #21262d;
+            border-radius: 20px;
+            transition: 0.3s;
+            border: 1px solid #30363d;
+        }
+        .slider::before {
+            content: "";
+            position: absolute;
+            width: 14px; height: 14px;
+            left: 2px; bottom: 2px;
+            background: #8b949e;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+        input:checked + .slider { background: #58a6ff; border-color: #58a6ff; }
+        input:checked + .slider::before { transform: translateX(16px); background: #0d1117; }
+    </style>
+</head>
+<body>
+    <h1>S&amp;P 500 全期間チャート</h1>
+    <p class="subtitle">1928年〜現在の歴史的価格推移（月次データ）</p>
+
+    <div class="stats" id="stats" style="display:none">
+        <div class="stat-item">
+            <div class="stat-label">現在値</div>
+            <div class="stat-value" id="stat-current">-</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-label">全期間騰落率</div>
+            <div class="stat-value" id="stat-return">-</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-label">過去最高値</div>
+            <div class="stat-value" id="stat-ath">-</div>
+        </div>
+        <div class="stat-item">
+            <div class="stat-label">データ期間</div>
+            <div class="stat-value blue" id="stat-range">-</div>
+        </div>
+    </div>
+
+    <div class="range-buttons" id="range-btns" style="display:none">
+        <button class="range-btn" onclick="setRange(1, this)">1Y</button>
+        <button class="range-btn" onclick="setRange(5, this)">5Y</button>
+        <button class="range-btn" onclick="setRange(10, this)">10Y</button>
+        <button class="range-btn" onclick="setRange(20, this)">20Y</button>
+        <button class="range-btn" onclick="setRange(50, this)">50Y</button>
+        <button class="range-btn active" onclick="setRange(null, this)">全期間</button>
+    </div>
+
+    <div class="log-toggle" id="log-toggle" style="display:none">
+        <span>対数スケール</span>
+        <label class="toggle-switch">
+            <input type="checkbox" id="log-check" onchange="toggleLog()">
+            <span class="slider"></span>
+        </label>
+    </div>
+
+    <div id="loading">
+        <div class="spinner"></div>
+        S&amp;P 500のデータを取得中...
+    </div>
+    <div id="error"></div>
+    <div id="chart"></div>
+
+    <script>
+        let allDates = [], allPrices = [];
+
+        async function fetchData() {
+            // Yahoo Finance public API (CORS enabled for browser)
+            const url = "https://query1.finance.yahoo.com/v8/finance/chart/%5EGSPC?range=max&interval=1mo&includePrePost=false";
+
+            const res = await fetch(url);
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json();
+
+            const result = json.chart.result[0];
+            const timestamps = result.timestamp;
+            const closes = result.indicators.quote[0].close;
+
+            allDates = [];
+            allPrices = [];
+            for (let i = 0; i < timestamps.length; i++) {
+                if (closes[i] != null) {
+                    const d = new Date(timestamps[i] * 1000);
+                    allDates.push(d.toISOString().split("T")[0]);
+                    allPrices.push(+closes[i].toFixed(2));
+                }
+            }
+            return { dates: allDates, prices: allPrices };
+        }
+
+        function renderChart(dates, prices) {
+            const isLog = document.getElementById("log-check").checked;
+
+            const trace = {
+                x: dates,
+                y: prices,
+                type: "scatter",
+                mode: "lines",
+                name: "S&P 500",
+                line: { color: "#58a6ff", width: 1.5 },
+                fill: "tozeroy",
+                fillcolor: "rgba(88,166,255,0.07)",
+                hovertemplate: "<b>%{x}</b><br>%{y:,.2f}<extra></extra>"
+            };
+
+            const layout = {
+                paper_bgcolor: "#0d1117",
+                plot_bgcolor: "#0d1117",
+                font: { color: "#e6edf3", size: 12 },
+                xaxis: {
+                    gridcolor: "#21262d",
+                    linecolor: "#30363d",
+                    rangeslider: { visible: true, bgcolor: "#161b22", bordercolor: "#30363d", thickness: 0.06 }
+                },
+                yaxis: {
+                    gridcolor: "#21262d",
+                    linecolor: "#30363d",
+                    title: "S&P 500 指数",
+                    tickformat: ",.0f",
+                    type: isLog ? "log" : "linear"
+                },
+                margin: { t: 10, r: 20, b: 60, l: 75 },
+                hovermode: "x unified",
+                hoverlabel: {
+                    bgcolor: "#161b22",
+                    bordercolor: "#30363d",
+                    font: { color: "#e6edf3" }
+                },
+                shapes: [
+                    { type: "line", x0: "2000-03-01", x1: "2000-03-01", y0: 0, y1: 1, yref: "paper", line: { color: "rgba(248,81,73,0.4)", width: 1, dash: "dot" } },
+                    { type: "line", x0: "2008-09-01", x1: "2008-09-01", y0: 0, y1: 1, yref: "paper", line: { color: "rgba(248,81,73,0.4)", width: 1, dash: "dot" } },
+                    { type: "line", x0: "2020-03-01", x1: "2020-03-01", y0: 0, y1: 1, yref: "paper", line: { color: "rgba(248,81,73,0.4)", width: 1, dash: "dot" } }
+                ],
+                annotations: [
+                    { x: "2000-03-01", y: 1, yref: "paper", text: "ITバブル", showarrow: false, font: { color: "rgba(248,81,73,0.7)", size: 10 }, xanchor: "left", yanchor: "top" },
+                    { x: "2008-09-01", y: 0.92, yref: "paper", text: "リーマン", showarrow: false, font: { color: "rgba(248,81,73,0.7)", size: 10 }, xanchor: "left", yanchor: "top" },
+                    { x: "2020-03-01", y: 0.84, yref: "paper", text: "COVID", showarrow: false, font: { color: "rgba(248,81,73,0.7)", size: 10 }, xanchor: "left", yanchor: "top" }
+                ]
+            };
+
+            const config = {
+                responsive: true,
+                displayModeBar: true,
+                modeBarButtonsToRemove: ["lasso2d", "select2d", "autoScale2d"],
+                displaylogo: false
+            };
+
+            Plotly.react("chart", [trace], layout, config);
+        }
+
+        function updateStats(dates, prices) {
+            const current = prices[prices.length - 1];
+            const start = prices[0];
+            const ath = Math.max(...prices);
+            const totalReturn = ((current / start) - 1) * 100;
+
+            document.getElementById("stat-current").textContent = current.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            const retEl = document.getElementById("stat-return");
+            retEl.textContent = (totalReturn >= 0 ? "+" : "") + totalReturn.toFixed(1) + "%";
+            retEl.className = "stat-value" + (totalReturn < 0 ? " negative" : "");
+
+            document.getElementById("stat-ath").textContent = ath.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            const startDate = dates[0].substring(0, 7).replace("-", "/");
+            const endDate = dates[dates.length - 1].substring(0, 7).replace("-", "/");
+            document.getElementById("stat-range").textContent = `${startDate} 〜 ${endDate}`;
+
+            document.getElementById("stats").style.display = "flex";
+            document.getElementById("range-btns").style.display = "flex";
+            document.getElementById("log-toggle").style.display = "flex";
+        }
+
+        function setRange(years, btn) {
+            document.querySelectorAll(".range-btn").forEach(b => b.classList.remove("active"));
+            btn.classList.add("active");
+
+            if (years === null) {
+                Plotly.relayout("chart", { "xaxis.autorange": true });
+            } else {
+                const end = new Date();
+                const start = new Date();
+                start.setFullYear(end.getFullYear() - years);
+                Plotly.relayout("chart", {
+                    "xaxis.range": [start.toISOString().split("T")[0], end.toISOString().split("T")[0]]
+                });
+            }
+        }
+
+        function toggleLog() {
+            renderChart(allDates, allPrices);
+        }
+
+        async function init() {
+            try {
+                const { dates, prices } = await fetchData();
+                document.getElementById("loading").style.display = "none";
+                updateStats(dates, prices);
+                renderChart(dates, prices);
+            } catch (err) {
+                document.getElementById("loading").style.display = "none";
+                const errEl = document.getElementById("error");
+                errEl.style.display = "block";
+                errEl.innerHTML = `
+                    <strong>データの取得に失敗しました</strong><br><br>
+                    ${err.message}<br><br>
+                    <small>Yahoo Financeへのアクセスが必要です。ブラウザのCORS設定やネットワーク環境をご確認ください。</small>
+                `;
+            }
+        }
+
+        init();
+    </script>
+</body>
+</html>
