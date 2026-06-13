@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>施工ディテール集</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="header-inner">
+      <h1 class="logo">施工ディテール集</h1>
+      <div class="header-actions">
+        <div class="search-wrap">
+          <input type="text" id="searchInput" class="search-input" placeholder="タイトル・タグで検索…" />
+          <span class="search-icon">🔍</span>
+        </div>
+        <button class="btn btn-primary" id="addBtn">＋ ディテール追加</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <p class="sidebar-label">部位カテゴリ</p>
+      <ul class="category-list" id="categoryList"></ul>
+      <p class="sidebar-label" style="margin-top:24px;">タグ</p>
+      <div class="tag-cloud" id="tagCloud"></div>
+    </aside>
+
+    <main class="main">
+      <div class="toolbar">
+        <span id="resultCount" class="result-count"></span>
+        <div class="view-toggle">
+          <button class="view-btn active" id="gridViewBtn" title="グリッド表示">⊞</button>
+          <button class="view-btn" id="listViewBtn" title="リスト表示">☰</button>
+        </div>
+      </div>
+      <div class="card-grid" id="cardGrid"></div>
+      <div class="empty-state" id="emptyState" style="display:none;">
+        <div class="empty-icon">📐</div>
+        <p>ディテールがまだ登録されていません</p>
+        <button class="btn btn-primary" id="emptyAddBtn">最初のディテールを追加</button>
+      </div>
+    </main>
+  </div>
+
+  <!-- 追加/編集モーダル -->
+  <div class="modal-overlay" id="editModal" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modalTitle">ディテールを追加</h2>
+        <button class="modal-close" id="modalClose">✕</button>
+      </div>
+      <div class="modal-body">
+        <form id="detailForm">
+          <div class="form-row">
+            <label class="form-label">タイトル <span class="required">*</span></label>
+            <input type="text" id="fTitle" class="form-input" placeholder="例：床とGL壁の取り合い" required />
+          </div>
+          <div class="form-row">
+            <label class="form-label">部位カテゴリ <span class="required">*</span></label>
+            <select id="fCategory" class="form-input" required>
+              <option value="">選択してください</option>
+              <option value="床と壁">床と壁</option>
+              <option value="壁と天井">壁と天井</option>
+              <option value="壁と開口部">壁と開口部（窓・ドア）</option>
+              <option value="床と開口部">床と開口部（サッシ下端）</option>
+              <option value="外壁と屋根">外壁と屋根</option>
+              <option value="基礎と外壁">基礎と外壁</option>
+              <option value="柱と梁">柱と梁</option>
+              <option value="その他">その他</option>
+            </select>
+          </div>
+          <div class="form-row">
+            <label class="form-label">画像</label>
+            <div class="image-upload-area" id="imageUploadArea">
+              <input type="file" id="fImage" accept="image/*,.pdf" hidden />
+              <img id="imagePreview" style="display:none;" />
+              <div id="uploadPlaceholder" class="upload-placeholder">
+                <span class="upload-icon">🖼️</span>
+                <p>クリックまたはドラッグして画像をアップロード</p>
+                <p class="upload-hint">JPG / PNG / GIF 対応</p>
+              </div>
+              <button type="button" class="btn btn-outline remove-image-btn" id="removeImageBtn" style="display:none;">画像を削除</button>
+            </div>
+          </div>
+          <div class="form-row">
+            <label class="form-label">メモ・説明</label>
+            <textarea id="fMemo" class="form-input form-textarea" placeholder="仕様、注意事項、使用材料などを記入…" rows="4"></textarea>
+          </div>
+          <div class="form-row">
+            <label class="form-label">タグ</label>
+            <div class="tag-input-wrap">
+              <div class="tag-chips" id="tagChips"></div>
+              <input type="text" id="fTagInput" class="tag-text-input" placeholder="タグを入力してEnter（例：RC造、防水）" />
+            </div>
+            <p class="form-hint">Enter キーでタグを追加</p>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline" id="cancelBtn">キャンセル</button>
+        <button class="btn btn-primary" id="saveBtn">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 詳細表示モーダル -->
+  <div class="modal-overlay" id="viewModal" style="display:none;">
+    <div class="modal modal-view">
+      <div class="modal-header">
+        <div>
+          <span class="view-category-badge" id="viewCategory"></span>
+          <h2 id="viewTitle"></h2>
+        </div>
+        <button class="modal-close" id="viewClose">✕</button>
+      </div>
+      <div class="modal-body view-body">
+        <div class="view-image-wrap" id="viewImageWrap" style="display:none;">
+          <img id="viewImage" />
+        </div>
+        <div class="view-meta">
+          <div class="view-tags" id="viewTags"></div>
+          <div class="view-memo" id="viewMemo"></div>
+          <p class="view-date" id="viewDate"></p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-outline btn-danger" id="deleteBtn">削除</button>
+        <button class="btn btn-outline" id="editFromViewBtn">編集</button>
+        <button class="btn btn-primary" id="viewClose2">閉じる</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
