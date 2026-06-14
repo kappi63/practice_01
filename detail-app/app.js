@@ -27,6 +27,7 @@ let searchQuery = '';
 let isListView = false;
 let editingId = null;
 let editTags = [];
+let imageMode = 'upload'; // 'upload' | 'url'
 
 // ── Storage ──
 const STORAGE_KEY = 'detail_app_v1';
@@ -182,6 +183,14 @@ function escHtml(str) {
 }
 
 // ── Edit Modal ──
+function switchImageTab(mode) {
+  imageMode = mode;
+  document.getElementById('tabUpload').classList.toggle('active', mode === 'upload');
+  document.getElementById('tabUrl').classList.toggle('active', mode === 'url');
+  document.getElementById('panelUpload').style.display = mode === 'upload' ? '' : 'none';
+  document.getElementById('panelUrl').style.display = mode === 'url' ? '' : 'none';
+}
+
 function openAddModal() {
   editingId = null;
   editTags = [];
@@ -190,6 +199,8 @@ function openAddModal() {
   document.getElementById('fCategory').value = '';
   document.getElementById('fMemo').value = '';
   clearImagePreview();
+  clearUrlPreview();
+  switchImageTab('upload');
   renderTagChips();
   document.getElementById('editModal').style.display = 'flex';
 }
@@ -203,10 +214,19 @@ function openEditModal(id) {
   document.getElementById('fTitle').value = d.title;
   document.getElementById('fCategory').value = d.category;
   document.getElementById('fMemo').value = d.memo || '';
+  clearImagePreview();
+  clearUrlPreview();
   if (d.image) {
-    setImagePreview(d.image);
+    if (d.imageMode === 'url') {
+      switchImageTab('url');
+      document.getElementById('fImageUrl').value = d.image;
+      setUrlPreview(d.image);
+    } else {
+      switchImageTab('upload');
+      setImagePreview(d.image);
+    }
   } else {
-    clearImagePreview();
+    switchImageTab('upload');
   }
   renderTagChips();
   closeViewModal();
@@ -273,16 +293,21 @@ function saveDetail() {
   if (!title) { alert('タイトルを入力してください'); return; }
   if (!category) { alert('部位カテゴリを選択してください'); return; }
 
-  const image = document.getElementById('imagePreview').style.display !== 'none'
-    ? document.getElementById('imagePreview').src
-    : '';
+  let image = '';
+  if (imageMode === 'upload') {
+    const prev = document.getElementById('imagePreview');
+    image = prev.style.display !== 'none' ? prev.src : '';
+  } else {
+    const urlPrev = document.getElementById('urlPreview');
+    image = urlPrev.style.display !== 'none' ? urlPrev.src : '';
+  }
   const memo = document.getElementById('fMemo').value.trim();
 
   if (editingId) {
     const d = details.find(x => x.id === editingId);
-    Object.assign(d, { title, category, image, memo, tags: [...editTags] });
+    Object.assign(d, { title, category, image, imageMode, memo, tags: [...editTags] });
   } else {
-    details.unshift({ id: genId(), title, category, image, memo, tags: [...editTags], createdAt: Date.now() });
+    details.unshift({ id: genId(), title, category, image, imageMode, memo, tags: [...editTags], createdAt: Date.now() });
   }
 
   save();
@@ -313,6 +338,37 @@ function handleFileSelect(file) {
   const reader = new FileReader();
   reader.onload = e => setImagePreview(e.target.result);
   reader.readAsDataURL(file);
+}
+
+// ── URL image ──
+function setUrlPreview(url) {
+  const img = document.getElementById('urlPreview');
+  const wrap = document.getElementById('urlPreviewWrap');
+  const errEl = document.getElementById('urlError');
+  const removeBtn = document.getElementById('removeUrlBtn');
+  img.style.display = 'none';
+  errEl.style.display = 'none';
+  removeBtn.style.display = 'none';
+  wrap.style.display = '';
+  img.onload = () => {
+    img.style.display = '';
+    removeBtn.style.display = '';
+    errEl.style.display = 'none';
+  };
+  img.onerror = () => {
+    img.style.display = 'none';
+    errEl.style.display = '';
+    removeBtn.style.display = 'none';
+  };
+  img.src = url;
+}
+
+function clearUrlPreview() {
+  document.getElementById('fImageUrl').value = '';
+  document.getElementById('urlPreviewWrap').style.display = 'none';
+  document.getElementById('urlPreview').src = '';
+  document.getElementById('urlError').style.display = 'none';
+  document.getElementById('removeUrlBtn').style.display = 'none';
 }
 
 // ── Tag chips ──
@@ -398,6 +454,25 @@ function init() {
     handleFileSelect(e.dataTransfer.files[0]);
   });
   document.getElementById('removeImageBtn').addEventListener('click', clearImagePreview);
+
+  // Image tabs
+  document.getElementById('tabUpload').addEventListener('click', () => switchImageTab('upload'));
+  document.getElementById('tabUrl').addEventListener('click', () => switchImageTab('url'));
+
+  // URL load
+  document.getElementById('loadUrlBtn').addEventListener('click', () => {
+    const url = document.getElementById('fImageUrl').value.trim();
+    if (!url) return;
+    setUrlPreview(url);
+  });
+  document.getElementById('fImageUrl').addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const url = e.target.value.trim();
+      if (url) setUrlPreview(url);
+    }
+  });
+  document.getElementById('removeUrlBtn').addEventListener('click', clearUrlPreview);
 
   // Tag input
   document.getElementById('fTagInput').addEventListener('keydown', e => {
