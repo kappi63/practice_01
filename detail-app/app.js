@@ -152,8 +152,12 @@ function renderCards() {
 
   grid.innerHTML = list.map(d => {
     const ci = catIndex(d.category);
+    const isPdf = d.image && (d.image.startsWith('data:application/pdf') ||
+                  (d.imageMode === 'upload' && d.fileName && d.fileName.toLowerCase().endsWith('.pdf')));
     const imageHtml = d.image
-      ? `<div class="card-image"><img src="${d.image}" alt="" loading="lazy" /></div>`
+      ? isPdf
+        ? `<div class="card-image no-image" style="background:#fff8f0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;font-size:36px;">📄<span style="font-size:11px;color:var(--text-muted);">${escHtml(d.fileName || 'PDF')}</span></div>`
+        : `<div class="card-image"><img src="${d.image}" alt="" loading="lazy" /></div>`
       : `<div class="card-image no-image" style="background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:36px;">📐</div>`;
     const tagsHtml = (d.tags || []).map(t => `<span class="tag">${t}</span>`).join('');
     return `
@@ -223,7 +227,7 @@ function openEditModal(id) {
       setUrlPreview(d.image);
     } else {
       switchImageTab('upload');
-      setImagePreview(d.image);
+      setImagePreview(d.image, d.fileName);
     }
   } else {
     switchImageTab('upload');
@@ -252,11 +256,25 @@ function openViewModal(id) {
   document.getElementById('viewTitle').textContent = d.title;
 
   const imgWrap = document.getElementById('viewImageWrap');
+  const viewImg = document.getElementById('viewImage');
+  const viewPdf = document.getElementById('viewPdf');
   if (d.image) {
-    document.getElementById('viewImage').src = d.image;
+    const isPdf = d.image.startsWith('data:application/pdf') ||
+                  (d.imageMode === 'upload' && d.fileName && d.fileName.toLowerCase().endsWith('.pdf'));
+    if (isPdf) {
+      viewImg.style.display = 'none';
+      viewPdf.src = d.image;
+      viewPdf.style.display = '';
+    } else {
+      viewPdf.style.display = 'none';
+      viewImg.src = d.image;
+      viewImg.style.display = '';
+    }
     imgWrap.style.display = '';
   } else {
     imgWrap.style.display = 'none';
+    viewImg.style.display = 'none';
+    viewPdf.style.display = 'none';
   }
 
   document.getElementById('viewTags').innerHTML =
@@ -295,19 +313,22 @@ function saveDetail() {
 
   let image = '';
   if (imageMode === 'upload') {
-    const prev = document.getElementById('imagePreview');
-    image = prev.style.display !== 'none' ? prev.src : '';
+    const img = document.getElementById('imagePreview');
+    const pdf = document.getElementById('pdfPreview');
+    if (img.style.display !== 'none') image = img.src;
+    else if (pdf.style.display !== 'none') image = pdf.src;
   } else {
     const urlPrev = document.getElementById('urlPreview');
     image = urlPrev.style.display !== 'none' ? urlPrev.src : '';
   }
   const memo = document.getElementById('fMemo').value.trim();
 
+  const fileName = imageMode === 'upload' ? currentFileName : '';
   if (editingId) {
     const d = details.find(x => x.id === editingId);
-    Object.assign(d, { title, category, image, imageMode, memo, tags: [...editTags] });
+    Object.assign(d, { title, category, image, imageMode, fileName, memo, tags: [...editTags] });
   } else {
-    details.unshift({ id: genId(), title, category, image, imageMode, memo, tags: [...editTags], createdAt: Date.now() });
+    details.unshift({ id: genId(), title, category, image, imageMode, fileName, memo, tags: [...editTags], createdAt: Date.now() });
   }
 
   save();
@@ -315,28 +336,58 @@ function saveDetail() {
   render();
 }
 
-// ── Image upload ──
-function setImagePreview(src) {
-  const img = document.getElementById('imagePreview');
-  img.src = src;
-  img.style.display = '';
+// ── File upload (image or PDF) ──
+function setImagePreview(src, filename) {
+  const isPdf = src.startsWith('data:application/pdf') || (filename && filename.toLowerCase().endsWith('.pdf'));
   document.getElementById('uploadPlaceholder').style.display = 'none';
   document.getElementById('removeImageBtn').style.display = '';
+  document.getElementById('pdfSizeWarn').style.display = 'none';
+
+  if (isPdf) {
+    document.getElementById('imagePreview').style.display = 'none';
+    const embed = document.getElementById('pdfPreview');
+    embed.src = src;
+    embed.style.display = '';
+    const nameEl = document.getElementById('uploadFileName');
+    nameEl.textContent = filename ? `📄 ${filename}` : '📄 PDFファイル';
+    nameEl.style.display = '';
+  } else {
+    document.getElementById('pdfPreview').style.display = 'none';
+    document.getElementById('uploadFileName').style.display = 'none';
+    const img = document.getElementById('imagePreview');
+    img.src = src;
+    img.style.display = '';
+  }
 }
 
 function clearImagePreview() {
-  const img = document.getElementById('imagePreview');
-  img.src = '';
-  img.style.display = 'none';
+  document.getElementById('imagePreview').src = '';
+  document.getElementById('imagePreview').style.display = 'none';
+  document.getElementById('pdfPreview').src = '';
+  document.getElementById('pdfPreview').style.display = 'none';
   document.getElementById('uploadPlaceholder').style.display = '';
   document.getElementById('removeImageBtn').style.display = 'none';
+  document.getElementById('uploadFileName').style.display = 'none';
+  document.getElementById('pdfSizeWarn').style.display = 'none';
   document.getElementById('fImage').value = '';
 }
 
+let currentFileName = '';
+
 function handleFileSelect(file) {
-  if (!file || !file.type.startsWith('image/')) return;
+  if (!file) return;
+  const isPdf = file.type === 'application/pdf';
+  const isImage = file.type.startsWith('image/');
+  if (!isPdf && !isImage) return;
+
+  currentFileName = file.name;
+
+  if (file.size > 5 * 1024 * 1024) {
+    document.getElementById('pdfSizeWarn').style.display = '';
+  }
+
   const reader = new FileReader();
-  reader.onload = e => setImagePreview(e.target.result);
+  reader.onload = e => setImagePreview(e.target.result, file.name);
   reader.readAsDataURL(file);
 }
 

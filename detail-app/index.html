@@ -81,15 +81,18 @@
             <!-- ファイルアップロード -->
             <div id="panelUpload">
               <div class="image-upload-area" id="imageUploadArea">
-                <input type="file" id="fImage" accept="image/*,.pdf" hidden />
+                <input type="file" id="fImage" accept="image/*,application/pdf" hidden />
                 <img id="imagePreview" style="display:none;" />
+                <embed id="pdfPreview" type="application/pdf" style="display:none;width:100%;height:260px;border-radius:6px;" />
                 <div id="uploadPlaceholder" class="upload-placeholder">
-                  <span class="upload-icon">🖼️</span>
-                  <p>クリックまたはドラッグして画像をアップロード</p>
-                  <p class="upload-hint">JPG / PNG / GIF 対応</p>
+                  <span class="upload-icon">📄</span>
+                  <p>クリックまたはドラッグしてファイルをアップロード</p>
+                  <p class="upload-hint">JPG / PNG / PDF 対応</p>
                 </div>
-                <button type="button" class="btn btn-outline remove-image-btn" id="removeImageBtn" style="display:none;">画像を削除</button>
+                <p id="uploadFileName" class="upload-filename" style="display:none;"></p>
+                <button type="button" class="btn btn-outline remove-image-btn" id="removeImageBtn" style="display:none;">ファイルを削除</button>
               </div>
+              <p class="form-hint" id="pdfSizeWarn" style="display:none;color:var(--danger);">⚠ ファイルが大きいため保存できない場合があります（目安：5MB以下推奨）</p>
             </div>
             <!-- URL入力 -->
             <div id="panelUrl" style="display:none;">
@@ -138,7 +141,8 @@
       </div>
       <div class="modal-body view-body">
         <div class="view-image-wrap" id="viewImageWrap" style="display:none;">
-          <img id="viewImage" />
+          <img id="viewImage" style="display:none;" />
+          <embed id="viewPdf" type="application/pdf" style="display:none;width:100%;height:480px;border-radius:8px;" />
         </div>
         <div class="view-meta">
           <div class="view-tags" id="viewTags"></div>

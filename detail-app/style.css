@@ -391,6 +391,14 @@ body {
 .upload-icon { font-size: 32px; display: block; margin-bottom: 4px; }
 .upload-placeholder p { font-size: 13px; color: var(--text-muted); }
 .upload-hint { font-size: 12px !important; color: #9ca3af !important; }
+.upload-filename {
+  font-size: 12px;
+  color: var(--text-muted);
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  padding: 4px 10px;
+  margin-top: 4px;
+}
 #imagePreview {
   max-width: 100%;
   max-height: 200px;
