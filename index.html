@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>建築鋼材表 検索アプリ</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --text: #1c2733;
+    --muted: #5b6b7b;
+    --border: #d9dee5;
+    --accent: #1a5fb4;
+    --accent-soft: #e7effa;
+    --row-hover: #eef4fc;
+    --th-bg: #f0f3f7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14181d;
+      --panel: #1d232b;
+      --text: #e6ebf1;
+      --muted: #96a4b3;
+      --border: #333d49;
+      --accent: #62a0ea;
+      --accent-soft: #24344a;
+      --row-hover: #263243;
+      --th-bg: #232b35;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic UI", "Meiryo", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+  }
+  header {
+    padding: 16px 20px 0;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  h1 { font-size: 1.25rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 0.8rem; margin: 0 0 12px; }
+  main { max-width: 1200px; margin: 0 auto; padding: 0 20px 40px; }
+
+  .tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .tab {
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--text);
+    padding: 7px 14px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-size: 0.85rem;
+  }
+  .tab.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: #fff;
+    font-weight: 600;
+  }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+  #search {
+    flex: 1 1 260px;
+    max-width: 420px;
+    padding: 9px 12px;
+    font-size: 0.95rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--text);
+  }
+  #search:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .count { color: var(--muted); font-size: 0.85rem; }
+
+  .table-wrap {
+    overflow-x: auto;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+  }
+  table { border-collapse: collapse; width: 100%; font-size: 0.85rem; white-space: nowrap; }
+  th, td { padding: 7px 12px; border-bottom: 1px solid var(--border); text-align: right; }
+  th:first-child, td:first-child { text-align: left; position: sticky; left: 0; background: inherit; }
+  thead th {
+    background: var(--th-bg);
+    position: sticky;
+    top: 0;
+    cursor: pointer;
+    user-select: none;
+    font-weight: 600;
+    color: var(--muted);
+  }
+  thead th:first-child { background: var(--th-bg); z-index: 2; }
+  thead th.sorted { color: var(--accent); }
+  tbody tr { background: var(--panel); cursor: pointer; }
+  tbody tr:hover { background: var(--row-hover); }
+  tbody td:first-child { font-weight: 600; }
+  .unit { font-weight: 400; font-size: 0.7rem; color: var(--muted); display: block; }
+  .empty { padding: 30px; text-align: center; color: var(--muted); }
+
+  .note {
+    margin-top: 12px;
+    font-size: 0.75rem;
+    color: var(--muted);
+  }
+
+  /* 詳細モーダル */
+  #overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.45);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 10;
+  }
+  #overlay.show { display: flex; }
+  .modal {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    max-width: 420px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 20px;
+  }
+  .modal h2 { margin: 0 0 4px; font-size: 1.1rem; }
+  .modal .cat { color: var(--muted); font-size: 0.8rem; margin-bottom: 12px; }
+  .props { width: 100%; font-size: 0.85rem; }
+  .props td { padding: 5px 4px; border-bottom: 1px solid var(--border); }
+  .props td:first-child { color: var(--muted); text-align: left; }
+  .props td:last-child { text-align: right; font-weight: 600; }
+  .calc {
+    margin-top: 14px;
+    background: var(--accent-soft);
+    border-radius: 8px;
+    padding: 12px;
+  }
+  .calc h3 { margin: 0 0 8px; font-size: 0.9rem; }
+  .calc .row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; font-size: 0.85rem; }
+  .calc input {
+    width: 90px;
+    padding: 6px 8px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--panel);
+    color: var(--text);
+    font-size: 0.9rem;
+    text-align: right;
+  }
+  .calc .result { font-size: 1.05rem; font-weight: 700; }
+  .close-btn {
+    margin-top: 14px;
+    width: 100%;
+    padding: 9px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--panel);
+    color: var(--text);
+    cursor: pointer;
+    font-size: 0.9rem;
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>建築鋼材表 検索アプリ</h1>
+  <p class="sub">JIS規格 形鋼・鋼管の断面性能と材料規格を検索できます。行をクリックすると詳細と重量計算を表示します。</p>
+</header>
+<main>
+  <div class="tabs" id="tabs"></div>
+  <div class="toolbar">
+    <input id="search" type="search" placeholder="例: H-300 / 200×200 / SS400 / 100" autocomplete="off">
+    <span class="count" id="count"></span>
+  </div>
+  <div class="table-wrap">
+    <table id="table">
+      <thead></thead>
+      <tbody></tbody>
+    </table>
+  </div>
+  <p class="note">※ 数値は JIS G 3192 / G 3466 / G 3444 等およびメーカーカタログに基づく参考値です。設計に使用する際は必ず最新のJIS規格・カタログ・告示で確認してください。単位質量は密度 7.85 g/cm³ 基準。</p>
+</main>
+
+<div id="overlay">
+  <div class="modal" role="dialog" aria-modal="true">
+    <h2 id="m-title"></h2>
+    <div class="cat" id="m-cat"></div>
+    <table class="props"><tbody id="m-props"></tbody></table>
+    <div class="calc">
+      <h3>重量計算</h3>
+      <div class="row">長さ <input id="calc-len" type="number" value="6" min="0" step="0.1"> m ×
+        <input id="calc-num" type="number" value="1" min="1" step="1"> 本</div>
+      <div class="result" id="calc-result"></div>
+    </div>
+    <button class="close-btn" onclick="closeModal()">閉じる</button>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* ---------- データ ----------
+   A: 断面積 cm² / W: 単位質量 kg/m / I: 断面二次モーメント cm⁴ / Z: 断面係数 cm³ */
+
+const H_STEEL = [
+  // [呼称(H×B), t1, t2, A, W, Ix, Iy, Zx, Zy]
+  ["100×50",5,7,11.85,9.30,187,14.8,37.5,5.91],
+  ["100×100",6,8,21.90,17.2,383,134,76.5,26.7],
+  ["125×60",6,8,16.84,13.2,413,29.2,66.1,9.73],
+  ["125×125",6.5,9,30.31,23.8,847,293,136,47.0],
+  ["150×75",5,7,17.85,14.0,666,49.5,88.8,13.2],
+  ["150×100",6,9,26.84,21.1,1020,151,138,30.1],
+  ["150×150",7,10,40.14,31.5,1640,563,219,75.1],
+  ["175×90",5,8,23.04,18.1,1210,97.5,138,21.7],
+  ["175×175",7.5,11,51.21,40.2,2880,984,330,112],
+  ["198×99",4.5,7,23.18,18.2,1580,114,160,23.0],
+  ["200×100",5.5,8,27.16,21.3,1840,134,184,26.8],
+  ["194×150",6,9,39.01,30.6,2690,507,277,67.6],
+  ["200×200",8,12,63.53,49.9,4720,1600,472,160],
+  ["200×204",12,12,71.53,56.2,4980,1700,498,167],
+  ["248×124",5,8,32.68,25.7,3540,255,285,41.1],
+  ["250×125",6,9,37.66,29.6,4050,294,324,47.0],
+  ["244×175",7,11,56.24,44.1,6120,984,502,113],
+  ["250×250",9,14,92.18,72.4,10800,3650,867,292],
+  ["298×149",5.5,8,40.80,32.0,6320,442,424,59.3],
+  ["300×150",6.5,9,46.78,36.7,7210,508,481,67.7],
+  ["294×200",8,12,72.38,56.8,11300,1600,771,160],
+  ["300×300",10,15,119.8,94.0,20400,6750,1360,450],
+  ["346×174",6,9,52.68,41.4,11100,792,641,91.0],
+  ["350×175",7,11,63.14,49.6,13600,984,775,112],
+  ["340×250",9,14,101.5,79.7,21700,3650,1280,292],
+  ["350×350",12,19,173.9,137,40300,13600,2300,776],
+  ["396×199",7,11,72.16,56.6,20000,1450,1010,145],
+  ["400×200",8,13,84.12,66.0,23700,1740,1190,174],
+  ["390×300",10,16,136.0,107,38700,7210,1980,481],
+  ["400×400",13,21,218.7,172,66600,22400,3330,1120],
+  ["446×199",8,12,84.30,66.2,28700,1580,1290,159],
+  ["450×200",9,14,96.76,76.0,33500,1870,1490,187],
+  ["440×300",11,18,157.4,124,56100,8110,2550,541],
+  ["496×199",9,14,101.3,79.5,41900,1840,1690,185],
+  ["500×200",10,16,114.2,89.6,47800,2140,1910,214],
+  ["488×300",11,18,163.5,128,71000,8110,2910,541],
+  ["596×199",10,15,120.5,94.6,68700,1980,2310,199],
+  ["600×200",11,17,134.4,106,77600,2280,2590,228],
+  ["588×300",12,20,192.5,151,118000,9020,4020,601],
+  ["700×300",13,24,235.5,185,201000,10800,5760,722],
+  ["800×300",14,26,267.4,210,292000,11700,7290,782],
+  ["900×300",16,28,309.8,243,411000,12600,9140,843],
+].map(r => ({
+  name: `H-${r[0]}×${r[1]}×${r[2]}`, size: r[0], t1: r[1], t2: r[2],
+  A: r[3], W: r[4], Ix: r[5], Iy: r[6], Zx: r[7], Zy: r[8],
+  ix: rg(r[5], r[3]), iy: rg(r[6], r[3]),
+}));
+
+const SQUARE_PIPE = [
+  // [辺, t, W, A, I, Z]
+  [50,3.2,4.50,5.727,20.4,8.16],
+  [60,3.2,5.50,7.007,36.9,12.3],
+  [75,3.2,7.01,8.927,75.5,20.1],
+  [75,4.5,9.55,12.17,98.6,26.3],
+  [100,3.2,9.52,12.13,187,37.5],
+  [100,4.5,13.1,16.67,249,49.9],
+  [100,6.0,16.8,21.36,308,61.7],
+  [125,4.5,16.6,21.17,498,79.7],
+  [125,6.0,21.7,27.63,641,103],
+  [150,4.5,20.1,25.67,896,120],
+  [150,6.0,26.4,33.63,1150,153],
+  [150,9.0,38.2,48.66,1580,210],
+  [175,6.0,31.1,39.63,1860,213],
+  [200,6.0,35.8,45.63,2830,283],
+  [200,8.0,46.9,59.79,3620,362],
+  [200,9.0,52.3,66.68,3980,398],
+  [200,12,67.9,86.50,4980,498],
+  [250,9.0,66.5,84.68,8090,647],
+  [250,12,87.0,110.8,10300,821],
+  [300,9.0,80.6,102.7,14300,956],
+  [300,12,106,134.8,18300,1220],
+  [300,16,138,176.4,23100,1540],
+  [350,12,125,158.8,29700,1700],
+  [350,16,164,208.4,38100,2180],
+  [400,12,144,182.8,45000,2250],
+  [400,16,189,240.4,58200,2910],
+  [400,19,220,280.3,67000,3350],
+].map(r => ({
+  name: `□-${r[0]}×${r[0]}×${r[1]}`, size: `${r[0]}×${r[0]}`, t: r[1],
+  W: r[2], A: r[3], I: r[4], Z: r[5], i: rg(r[4], r[3]),
+}));
+
+const ROUND_PIPE = [
+  // [外径D, t] — 断面性能は幾何計算
+  [48.6,2.3],[60.5,3.2],[76.3,3.2],[89.1,3.2],[101.6,4.2],
+  [114.3,4.5],[139.8,4.5],[165.2,5.0],[190.7,5.3],[216.3,5.8],
+  [267.4,6.6],[318.5,6.9],[355.6,7.9],[406.4,9.5],[457.2,9.5],[508.0,9.5],
+].map(([D,t]) => {
+  const d = D - 2*t;
+  const A = Math.PI/4 * (D*D - d*d) / 100;             // cm²
+  const I = Math.PI/64 * (D**4 - d**4) / 10000;        // cm⁴
+  const Z = I / (D/2/10);                              // cm³
+  return {
+    name: `φ-${D}×${t}`, D, t,
+    A: sig(A), W: sig(A*0.785), I: sig(I), Z: sig(Z), i: rg(I, A),
+  };
+});
+
+const CHANNEL = [
+  // [呼称(H×B), t1, t2, A, W, Ix, Iy, Zx, Zy]
+  ["100×50",5,7.5,11.92,9.36,188,26.0,37.6,7.52],
+  ["125×65",6,8,17.11,13.4,424,61.8,67.8,13.4],
+  ["150×75",6.5,10,23.71,18.6,861,117,115,22.4],
+  ["150×75",9,12.5,30.59,24.0,1050,147,140,28.3],
+  ["180×75",7,10.5,27.20,21.4,1380,131,153,24.3],
+  ["200×80",7.5,11,31.33,24.6,1950,168,195,29.1],
+  ["200×90",8,13.5,38.65,30.3,2490,277,249,44.2],
+  ["250×90",9,13,44.07,34.6,4180,294,334,44.5],
+  ["300×90",9,13,48.57,38.1,6440,309,429,45.7],
+  ["300×90",12,16,61.90,48.6,7870,379,525,54.1],
+  ["380×100",10.5,16,69.39,54.5,14500,535,763,70.5],
+].map(r => ({
+  name: `[-${r[0]}×${r[1]}×${r[2]}`, size: r[0], t1: r[1], t2: r[2],
+  A: r[3], W: r[4], Ix: r[5], Iy: r[6], Zx: r[7], Zy: r[8],
+}));
+
+const ANGLE = [
+  // [辺, t, A, W, I, Z]（等辺山形鋼、I・Zは辺に平行な図心軸）
+  [40,3,2.336,1.83,3.53,1.21],
+  [40,5,3.755,2.95,5.42,1.91],
+  [50,4,3.892,3.06,9.06,2.49],
+  [50,6,5.644,4.43,12.6,3.55],
+  [60,5,5.802,4.55,19.6,4.52],
+  [65,6,7.527,5.91,29.4,6.26],
+  [65,8,9.761,7.66,36.8,8.02],
+  [75,6,8.727,6.85,46.1,8.47],
+  [75,9,12.69,9.96,64.4,12.1],
+  [75,12,16.56,13.0,81.9,15.7],
+  [90,7,12.22,9.59,93.0,14.2],
+  [90,10,17.00,13.3,125,19.5],
+  [90,13,21.71,17.0,156,24.8],
+  [100,7,13.62,10.7,129,17.7],
+  [100,10,19.00,14.9,175,24.4],
+  [100,13,24.31,19.1,220,31.1],
+  [130,9,22.74,17.9,366,38.7],
+  [130,12,29.76,23.4,467,49.9],
+  [150,12,34.77,27.3,740,68.1],
+  [150,15,42.74,33.6,888,82.6],
+  [175,12,40.52,31.8,1170,91.8],
+  [200,15,57.75,45.3,2180,150],
+  [200,20,76.00,59.7,2820,197],
+  [250,25,119.4,93.7,6950,388],
+].map(r => ({
+  name: `L-${r[0]}×${r[0]}×${r[1]}`, size: `${r[0]}×${r[0]}`, t: r[1],
+  A: r[2], W: r[3], I: r[4], Z: r[5], i: rg(r[4], r[2]),
+}));
+
+const MATERIAL = [
+  // [記号, 規格, 降伏点/耐力, 引張強さ, F値(t≤40mm), 備考]
+  ["SS400","JIS G 3101 一般構造用圧延鋼材","245以上(t≤16) / 235以上","400〜510",235,"最も一般的な構造用鋼材"],
+  ["SM400A/B/C","JIS G 3106 溶接構造用圧延鋼材","245以上(t≤16) / 235以上","400〜510",235,"溶接性を保証"],
+  ["SM490A/B/C","JIS G 3106 溶接構造用圧延鋼材","325以上(t≤16) / 315以上","490〜610",325,"高強度・溶接構造用"],
+  ["SM490YA/YB","JIS G 3106 溶接構造用圧延鋼材","365以上(t≤16) / 355以上","490〜610",325,"降伏点を高めた材"],
+  ["SN400A","JIS G 3136 建築構造用圧延鋼材","235以上","400〜510",235,"二次部材向け(溶接不可)"],
+  ["SN400B/C","JIS G 3136 建築構造用圧延鋼材","235〜355","400〜510",235,"降伏点上限規定あり・主要構造部材向け"],
+  ["SN490B/C","JIS G 3136 建築構造用圧延鋼材","325〜445","490〜610",325,"高強度・主要構造部材向け"],
+  ["BCR295","冷間ロール成形角形鋼管(大臣認定)","295〜445","400〜550",295,"柱用角形鋼管"],
+  ["BCP235","冷間プレス成形角形鋼管(大臣認定)","235〜355","400〜510",235,"柱用角形鋼管"],
+  ["BCP325","冷間プレス成形角形鋼管(大臣認定)","325〜445","490〜610",325,"柱用角形鋼管"],
+  ["STK400","JIS G 3444 一般構造用炭素鋼鋼管","235以上","400以上",235,"円形鋼管"],
+  ["STK490","JIS G 3444 一般構造用炭素鋼鋼管","315以上","490以上",325,"円形鋼管(高強度)"],
+  ["STKR400","JIS G 3466 一般構造用角形鋼管","245以上","400以上",245,"角形鋼管"],
+  ["SD295","JIS G 3112 鉄筋コンクリート用棒鋼","295〜390","440〜600",null,"異形鉄筋"],
+  ["SD345","JIS G 3112 鉄筋コンクリート用棒鋼","345〜440","490以上",null,"異形鉄筋(最も一般的)"],
+  ["SD390","JIS G 3112 鉄筋コンクリート用棒鋼","390〜510","560以上",null,"異形鉄筋(高強度)"],
+].map(r => ({
+  name: r[0], std: r[1], yp: r[2], ts: r[3], F: r[4], note: r[5],
+}));
+
+function rg(I, A) { return Math.round(Math.sqrt(I / A) * 100) / 100; } // 回転半径 cm
+function sig(v) { // 有効数字3桁程度に丸め
+  if (v === 0) return 0;
+  const d = Math.ceil(Math.log10(Math.abs(v)));
+  const p = Math.pow(10, 3 - d);
+  return Math.round(v * p) / p;
+}
+
+/* ---------- カテゴリ定義 ---------- */
+const CATEGORIES = [
+  {
+    id: "h", label: "H形鋼", data: H_STEEL,
+    catName: "H形鋼(JIS G 3192)",
+    cols: [
+      ["name","呼称寸法","mm"],["t1","t₁","mm"],["t2","t₂","mm"],
+      ["A","断面積","cm²"],["W","単位質量","kg/m"],
+      ["Ix","Ix","cm⁴"],["Iy","Iy","cm⁴"],
+      ["ix","ix","cm"],["iy","iy","cm"],
+      ["Zx","Zx","cm³"],["Zy","Zy","cm³"],
+    ],
+  },
+  {
+    id: "sq", label: "角形鋼管", data: SQUARE_PIPE,
+    catName: "角形鋼管(STKR / BCR等)",
+    cols: [
+      ["name","呼称寸法","mm"],["t","板厚","mm"],
+      ["A","断面積","cm²"],["W","単位質量","kg/m"],
+      ["I","I","cm⁴"],["Z","Z","cm³"],["i","i","cm"],
+    ],
+  },
+  {
+    id: "rd", label: "円形鋼管", data: ROUND_PIPE,
+    catName: "円形鋼管(STK / JIS G 3444)",
+    cols: [
+      ["name","呼称寸法","mm"],["t","板厚","mm"],
+      ["A","断面積","cm²"],["W","単位質量","kg/m"],
+      ["I","I","cm⁴"],["Z","Z","cm³"],["i","i","cm"],
+    ],
+  },
+  {
+    id: "ch", label: "溝形鋼", data: CHANNEL,
+    catName: "溝形鋼(JIS G 3192)",
+    cols: [
+      ["name","呼称寸法","mm"],["t1","t₁","mm"],["t2","t₂","mm"],
+      ["A","断面積","cm²"],["W","単位質量","kg/m"],
+      ["Ix","Ix","cm⁴"],["Iy","Iy","cm⁴"],
+      ["Zx","Zx","cm³"],["Zy","Zy","cm³"],
+    ],
+  },
+  {
+    id: "an", label: "山形鋼", data: ANGLE,
+    catName: "等辺山形鋼(JIS G 3192)",
+    cols: [
+      ["name","呼称寸法","mm"],["t","板厚","mm"],
+      ["A","断面積","cm²"],["W","単位質量","kg/m"],
+      ["I","I","cm⁴"],["Z","Z","cm³"],["i","i","cm"],
+    ],
+  },
+  {
+    id: "mat", label: "材料規格", data: MATERIAL,
+    catName: "材料規格",
+    cols: [
+      ["name","記号",""],["std","規格",""],
+      ["yp","降伏点・耐力","N/mm²"],["ts","引張強さ","N/mm²"],
+      ["F","F値(t≤40)","N/mm²"],["note","備考",""],
+    ],
+  },
+];
+
+/* ---------- 状態 ---------- */
+let current = CATEGORIES[0];
+let sortKey = null;
+let sortAsc = true;
+
+const $tabs = document.getElementById("tabs");
+const $search = document.getElementById("search");
+const $thead = document.querySelector("#table thead");
+const $tbody = document.querySelector("#table tbody");
+const $count = document.getElementById("count");
+
+/* ---------- タブ ---------- */
+CATEGORIES.forEach(cat => {
+  const b = document.createElement("button");
+  b.className = "tab";
+  b.textContent = cat.label;
+  b.onclick = () => {
+    current = cat;
+    sortKey = null;
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    b.classList.add("active");
+    render();
+  };
+  $tabs.appendChild(b);
+});
+$tabs.firstChild.classList.add("active");
+
+/* ---------- 検索 ---------- */
+function normalize(s) {
+  return String(s)
+    .toLowerCase()
+    .replace(/[Ａ-Ｚａ-ｚ０-９]/g, c => String.fromCharCode(c.charCodeAt(0) - 0xFEE0))
+    .replace(/[×✕✖*ｘx]/g, "x")
+    .replace(/[‐－ーｰ\-]/g, "-")
+    .replace(/\s+/g, "");
+}
+function matches(row, terms) {
+  if (!terms.length) return true;
+  const hay = normalize(Object.values(row).join(" "));
+  return terms.every(t => hay.includes(t));
+}
+$search.addEventListener("input", render);
+
+/* ---------- 描画 ---------- */
+function render() {
+  const cols = current.cols;
+  $thead.innerHTML = "";
+  const tr = document.createElement("tr");
+  cols.forEach(([key, label, unit]) => {
+    const th = document.createElement("th");
+    th.innerHTML = label + (unit ? `<span class="unit">${unit}</span>` : "");
+    if (sortKey === key) {
+      th.classList.add("sorted");
+      th.innerHTML += sortAsc ? " ▲" : " ▼";
+    }
+    th.onclick = () => {
+      if (sortKey === key) { sortAsc = !sortAsc; }
+      else { sortKey = key; sortAsc = true; }
+      render();
+    };
+    tr.appendChild(th);
+  });
+  $thead.appendChild(tr);
+
+  const terms = normalize($search.value).split(/[,、\s]+/).filter(Boolean);
+  let rows = current.data.filter(r => matches(r, terms));
+
+  if (sortKey) {
+    rows = [...rows].sort((a, b) => {
+      const va = a[sortKey], vb = b[sortKey];
+      if (typeof va === "number" && typeof vb === "number") {
+        return sortAsc ? va - vb : vb - va;
+      }
+      return sortAsc
+        ? String(va ?? "").localeCompare(String(vb ?? ""), "ja")
+        : String(vb ?? "").localeCompare(String(va ?? ""), "ja");
+    });
+  }
+
+  $tbody.innerHTML = "";
+  if (!rows.length) {
+    $tbody.innerHTML = `<tr><td class="empty" colspan="${cols.length}" style="text-align:center">該当する鋼材がありません</td></tr>`;
+  }
+  rows.forEach(row => {
+    const tr = document.createElement("tr");
+    cols.forEach(([key]) => {
+      const td = document.createElement("td");
+      const v = row[key];
+      td.textContent = v == null ? "−" : (typeof v === "number" ? fmt(v) : v);
+      tr.appendChild(td);
+    });
+    tr.onclick = () => openModal(row);
+    $tbody.appendChild(tr);
+  });
+  $count.textContent = `${rows.length} / ${current.data.length} 件`;
+}
+
+function fmt(v) {
+  return v.toLocaleString("ja-JP", { maximumFractionDigits: 3 });
+}
+
+/* ---------- 詳細モーダル ---------- */
+const $overlay = document.getElementById("overlay");
+let modalRow = null;
+
+function openModal(row) {
+  modalRow = row;
+  document.getElementById("m-title").textContent = row.name;
+  document.getElementById("m-cat").textContent = current.catName;
+  const $props = document.getElementById("m-props");
+  $props.innerHTML = "";
+  current.cols.forEach(([key, label, unit]) => {
+    if (key === "name") return;
+    const v = row[key];
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${label}</td><td>${v == null ? "−" : (typeof v === "number" ? fmt(v) : v)}${unit && v != null ? " " + unit : ""}</td>`;
+    $props.appendChild(tr);
+  });
+  document.querySelector(".calc").style.display = ("W" in row) ? "" : "none";
+  $overlay.classList.add("show");
+  updateCalc();
+}
+function closeModal() { $overlay.classList.remove("show"); }
+$overlay.addEventListener("click", e => { if (e.target === $overlay) closeModal(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+function updateCalc() {
+  if (!modalRow || !("W" in modalRow)) return;
+  const len = parseFloat(document.getElementById("calc-len").value) || 0;
+  const num = parseInt(document.getElementById("calc-num").value) || 0;
+  const kg = modalRow.W * len * num;
+  document.getElementById("calc-result").textContent =
+    `重量: ${fmt(Math.round(kg * 10) / 10)} kg（${fmt(Math.round(kg / 1000 * 1000) / 1000)} t）`;
+}
+document.getElementById("calc-len").addEventListener("input", updateCalc);
+document.getElementById("calc-num").addEventListener("input", updateCalc);
+
+render();
+</script>
+</body>
+</html>
